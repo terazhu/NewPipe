@@ -141,6 +141,9 @@ public final class ChannelTabHelper {
     public static boolean showChannelTab(final Context context,
                                          final SharedPreferences sharedPreferences,
                                          final String tab) {
+        if (ChannelTabs.LIVESTREAMS.equals(tab)) {
+            return false;
+        }
         final int key = ChannelTabHelper.getShowTabKey(tab);
         if (key == -1) {
             return false;
@@ -154,6 +157,9 @@ public final class ChannelTabHelper {
         final List<String> contentFilters = tab.getContentFilters();
         if (contentFilters.isEmpty()) {
             return false; // this should never happen, but check just to be sure
+        }
+        if (ChannelTabs.LIVESTREAMS.equals(contentFilters.get(0))) {
+            return false;
         }
 
         final int key = ChannelTabHelper.getFetchFeedTabKey(contentFilters.get(0));

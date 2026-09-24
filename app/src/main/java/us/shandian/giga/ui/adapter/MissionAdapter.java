@@ -59,6 +59,7 @@ import com.google.android.material.snackbar.Snackbar;
 
 import org.schabi.newpipe.BuildConfig;
 import org.schabi.newpipe.R;
+import org.schabi.newpipe.download.OfflinePlayerActivity;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.UserAction;
@@ -150,6 +151,7 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         switch (viewType) {
             case DownloadManager.SPECIAL_PENDING:
             case DownloadManager.SPECIAL_FINISHED:
+            case DownloadManager.SPECIAL_CHANNEL:
                 return new ViewHolderHeader(mInflater.inflate(R.layout.missions_header, parent, false));
         }
 
@@ -182,6 +184,10 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
 
         if (view instanceof ViewHolderHeader) {
             if (item.special == DownloadManager.SPECIAL_NOTHING) return;
+            if (item.special == DownloadManager.SPECIAL_CHANNEL) {
+                ((ViewHolderHeader) view).header.setText(item.label);
+                return;
+            }
             int str;
             if (item.special == DownloadManager.SPECIAL_PENDING) {
                 str = R.string.missions_header_pending;
@@ -219,7 +225,9 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             h.progress.setMarquee(false);
             h.status.setText("100%");
             h.progress.setProgress(1.0f);
-            h.size.setText(Utility.formatBytes(item.mission.length));
+            final String size = Utility.formatBytes(item.mission.length);
+            h.size.setText(item.mission.channel == null || item.mission.channel.isBlank()
+                    ? size : item.mission.channel + " | " + size);
 
             DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault());
             Date date = new Date(item.mission.timestamp);
@@ -362,6 +370,14 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         chooserIntent.addFlags(FLAG_GRANT_PREFIX_URI_PERMISSION);
 
         ShareUtils.openIntentInApp(mContext, chooserIntent);
+    }
+
+    private void playOffline(@NonNull final Mission mission) {
+        if (checkInvalidFile(mission)) {
+            return;
+        }
+        mContext.startActivity(OfflinePlayerActivity.getIntent(
+                mContext, mission.storage.getUri(), mission.storage.getName()));
     }
 
     private void shareFile(Mission mission) {
@@ -902,7 +918,7 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
 
             itemView.setOnClickListener(v -> {
                 if (item.mission instanceof FinishedMission)
-                    viewWithFileProvider(item.mission);
+                    playOffline(item.mission);
             });
 
             itemView.setOnLongClickListener(v -> {

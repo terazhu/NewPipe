@@ -81,6 +81,12 @@ abstract class FeedDAO {
             OR s.upload_date IS NULL
             OR s.upload_date < :uploadDateBefore
         )
+        AND s.stream_type NOT IN (
+            'LIVE_STREAM',
+            'AUDIO_LIVE_STREAM',
+            'POST_LIVE_STREAM',
+            'POST_LIVE_AUDIO_STREAM'
+        )
 
         ORDER BY s.upload_date IS NULL DESC, s.upload_date DESC, s.uploader ASC
         LIMIT 500

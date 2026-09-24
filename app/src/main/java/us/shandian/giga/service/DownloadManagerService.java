@@ -411,6 +411,7 @@ public class DownloadManagerService extends Service {
         final DownloadMission mission = new DownloadMission(urls, storage, kind, ps);
         mission.threadCount = threads;
         mission.source = streamInfo.getUrl();
+        mission.channel = streamInfo.getUploaderName();
         mission.nearLength = nearLength;
         mission.recoveryInfo = recovery.toArray(new MissionRecoveryInfo[0]);
 

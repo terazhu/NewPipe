@@ -188,6 +188,10 @@ public class MainFragment extends BaseFragment implements TabLayout.OnTabSelecte
     private void setupTabs() {
         tabsList.clear();
         tabsList.addAll(tabsManager.getTabs());
+        final Tab downloadsTab = Tab.Type.DOWNLOADS.getTab();
+        if (!tabsList.contains(downloadsTab)) {
+            tabsList.add(downloadsTab);
+        }
 
         if (pagerAdapter == null || !pagerAdapter.sameTabs(tabsList)) {
             pagerAdapter = new SelectedTabsPagerAdapter(requireContext(),

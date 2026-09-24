@@ -227,10 +227,16 @@ public class DownloadDialog extends DialogFragment
             public void onServiceConnected(final ComponentName cname, final IBinder service) {
                 final DownloadManagerBinder mgr = (DownloadManagerBinder) service;
 
-                mainStorageAudio = mgr.getMainStorageAudio();
-                mainStorageVideo = mgr.getMainStorageVideo();
+                mainStorageAudio = createChannelStorage(
+                        Environment.DIRECTORY_MUSIC,
+                        DownloadManager.TAG_AUDIO,
+                        mgr.getMainStorageAudio());
+                mainStorageVideo = createChannelStorage(
+                        Environment.DIRECTORY_MOVIES,
+                        DownloadManager.TAG_VIDEO,
+                        mgr.getMainStorageVideo());
                 downloadManager = mgr.getDownloadManager();
-                askForSavePath = mgr.askForSavePath();
+                askForSavePath = false;
 
                 okButton.setEnabled(true);
 
@@ -242,6 +248,28 @@ public class DownloadDialog extends DialogFragment
                 // nothing to do
             }
         }, Context.BIND_AUTO_CREATE);
+    }
+
+    private StoredDirectoryHelper createChannelStorage(
+            @NonNull final String mediaDirectory,
+            @NonNull final String tag,
+            @Nullable final StoredDirectoryHelper fallback) {
+        final File appMediaDirectory = context.getExternalFilesDir(mediaDirectory);
+        final File root = appMediaDirectory == null ? context.getFilesDir() : appMediaDirectory;
+        String channel = FilenameUtils.createFilename(context, currentInfo.getUploaderName());
+        if (channel.isBlank()) {
+            channel = getString(R.string.offline_unknown_channel);
+        }
+
+        try {
+            return new StoredDirectoryHelper(
+                    context,
+                    Uri.fromFile(new File(root, "TubeCache" + File.separator + channel)),
+                    tag);
+        } catch (final IOException e) {
+            Log.e(TAG, "Unable to create the channel download directory", e);
+            return fallback;
+        }
     }
 
     /**

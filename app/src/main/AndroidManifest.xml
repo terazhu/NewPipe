@@ -135,6 +135,14 @@
             android:label="@string/app_name"
             android:launchMode="singleTask" />
 
+        <activity
+            android:name=".download.OfflinePlayerActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:exported="false"
+            android:label="@string/offline_player_title"
+            android:screenOrientation="sensor"
+            android:theme="@style/DarkTheme" />
+
         <service android:name="us.shandian.giga.service.DownloadManagerService"
             android:foregroundServiceType="dataSync" />
 

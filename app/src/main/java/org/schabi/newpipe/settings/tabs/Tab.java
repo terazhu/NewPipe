@@ -33,6 +33,8 @@ import org.schabi.newpipe.util.ServiceHelper;
 
 import java.util.Objects;
 
+import us.shandian.giga.ui.fragment.MissionsFragment;
+
 public abstract class Tab {
     private static final String JSON_TAB_ID_KEY = "tab_id";
 
@@ -162,6 +164,7 @@ public abstract class Tab {
         FEED(new FeedTab()),
         BOOKMARKS(new BookmarksTab()),
         HISTORY(new HistoryTab()),
+        DOWNLOADS(new DownloadsTab()),
         KIOSK(new KioskTab()),
         CHANNEL(new ChannelTab()),
         PLAYLIST(new PlaylistTab()),
@@ -307,6 +310,31 @@ public abstract class Tab {
         @Override
         public StatisticsPlaylistFragment getFragment(final Context context) {
             return new StatisticsPlaylistFragment();
+        }
+    }
+
+    public static class DownloadsTab extends Tab {
+        public static final int ID = 10;
+
+        @Override
+        public int getTabId() {
+            return ID;
+        }
+
+        @Override
+        public String getTabName(final Context context) {
+            return context.getString(R.string.downloads_title);
+        }
+
+        @DrawableRes
+        @Override
+        public int getTabIconRes(final Context context) {
+            return R.drawable.ic_file_download;
+        }
+
+        @Override
+        public MissionsFragment getFragment(final Context context) {
+            return new MissionsFragment();
         }
     }
 

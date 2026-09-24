@@ -119,6 +119,7 @@ public class MissionsFragment extends Fragment {
                 switch (mAdapter.getItemViewType(position)) {
                     case DownloadManager.SPECIAL_PENDING:
                     case DownloadManager.SPECIAL_FINISHED:
+                    case DownloadManager.SPECIAL_CHANNEL:
                         return SPAN_SIZE;
                     default:
                         return 1;

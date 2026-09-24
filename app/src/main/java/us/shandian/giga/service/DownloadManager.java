@@ -35,6 +35,7 @@ public class DownloadManager {
     public static final int SPECIAL_NOTHING = 0;
     public static final int SPECIAL_PENDING = 1;
     public static final int SPECIAL_FINISHED = 2;
+    public static final int SPECIAL_CHANNEL = 3;
 
     public static final String TAG_AUDIO = "audio";
     public static final String TAG_VIDEO = "video";
@@ -593,6 +594,13 @@ public class DownloadManager {
     public class MissionIterator extends DiffUtil.Callback {
         final Object FINISHED = new Object();
         final Object PENDING = new Object();
+        final class ChannelHeader {
+            private final String name;
+
+            ChannelHeader(final String name) {
+                this.name = name;
+            }
+        }
 
         ArrayList<Object> snapshot;
         ArrayList<Object> current;
@@ -633,7 +641,16 @@ public class DownloadManager {
                 }
                 if (finished.size() > 0) {
                     list.add(FINISHED);
-                    list.addAll(finished);
+                    String previousChannel = null;
+                    for (final Mission mission : finished) {
+                        final String channel = mission.channel == null || mission.channel.isBlank()
+                                ? "Unknown channel" : mission.channel;
+                        if (!channel.equals(previousChannel)) {
+                            list.add(new ChannelHeader(channel));
+                            previousChannel = channel;
+                        }
+                        list.add(mission);
+                    }
                 }
 
                 hasFinished = finished.size() > 0;
@@ -647,6 +664,9 @@ public class DownloadManager {
 
             if (object == PENDING) return new MissionItem(SPECIAL_PENDING);
             if (object == FINISHED) return new MissionItem(SPECIAL_FINISHED);
+            if (object instanceof ChannelHeader) {
+                return new MissionItem(SPECIAL_CHANNEL, ((ChannelHeader) object).name);
+            }
 
             return new MissionItem(SPECIAL_NOTHING, (Mission) object);
         }
@@ -656,6 +676,7 @@ public class DownloadManager {
 
             if (object == PENDING) return SPECIAL_PENDING;
             if (object == FINISHED) return SPECIAL_FINISHED;
+            if (object instanceof ChannelHeader) return SPECIAL_CHANNEL;
 
             return SPECIAL_NOTHING;
         }
@@ -740,6 +761,7 @@ public class DownloadManager {
     public static class MissionItem {
         public int special;
         public Mission mission;
+        public String label;
 
         MissionItem(int s, Mission m) {
             special = s;
@@ -747,7 +769,12 @@ public class DownloadManager {
         }
 
         MissionItem(int s) {
-            this(s, null);
+            this(s, (Mission) null);
+        }
+
+        MissionItem(final int s, final String label) {
+            this(s, (Mission) null);
+            this.label = label;
         }
     }
 

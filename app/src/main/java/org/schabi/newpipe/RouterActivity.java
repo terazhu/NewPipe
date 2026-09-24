@@ -49,6 +49,7 @@ import org.schabi.newpipe.databinding.ListRadioIconItemBinding;
 import org.schabi.newpipe.databinding.SingleChoiceDialogViewBinding;
 import org.schabi.newpipe.download.DownloadDialog;
 import org.schabi.newpipe.download.LoadingDialog;
+import org.schabi.newpipe.download.OfflinePlayerActivity;
 import org.schabi.newpipe.error.ErrorInfo;
 import org.schabi.newpipe.error.ErrorUtil;
 import org.schabi.newpipe.error.ReCaptchaActivity;
@@ -96,6 +97,8 @@ import io.reactivex.rxjava3.core.Single;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import io.reactivex.rxjava3.schedulers.Schedulers;
+import us.shandian.giga.get.FinishedMission;
+import us.shandian.giga.get.sqlite.FinishedMissionStore;
 
 /**
  * Get the url from the intent and open it in the chosen preferred player.
@@ -222,6 +225,16 @@ public class RouterActivity extends AppCompatActivity {
     }
 
     private void handleUrl(final String url) {
+        try (FinishedMissionStore store = new FinishedMissionStore(this)) {
+            final FinishedMission downloaded = store.findBySource(url);
+            if (downloaded != null && downloaded.storage.existsAsFile()) {
+                startActivity(OfflinePlayerActivity.getIntent(
+                        this, downloaded.storage.getUri(), downloaded.storage.getName()));
+                finish();
+                return;
+            }
+        }
+
         disposables.add(Observable
                 .fromCallable(() -> {
                     try {

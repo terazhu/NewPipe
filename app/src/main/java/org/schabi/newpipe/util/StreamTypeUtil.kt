@@ -51,4 +51,11 @@ object StreamTypeUtil {
         return streamType == StreamType.LIVE_STREAM ||
             streamType == StreamType.AUDIO_LIVE_STREAM
     }
+
+    @JvmStatic
+    fun isAnyLiveStream(streamType: StreamType): Boolean {
+        return isLiveStream(streamType) ||
+            streamType == StreamType.POST_LIVE_STREAM ||
+            streamType == StreamType.POST_LIVE_AUDIO_STREAM
+    }
 }

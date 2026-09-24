@@ -23,6 +23,7 @@ public class TabsJsonHelperTest {
     @Test
     public void testEmptyAndNullRead() throws TabsJsonHelper.InvalidJsonException {
         final List<Tab> defaultTabs = TabsJsonHelper.getDefaultTabs();
+        assertTrue(defaultTabs.contains(Tab.Type.DOWNLOADS.getTab()));
 
         final String emptyTabsJson = "{\"" + JSON_TABS_ARRAY_KEY + "\":[]}";
         List<Tab> items = TabsJsonHelper.getTabsFromJson(emptyTabsJson);

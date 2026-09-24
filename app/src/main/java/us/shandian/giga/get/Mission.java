@@ -16,6 +16,11 @@ public abstract class Mission implements Serializable {
     public String source;
 
     /**
+     * Channel or uploader name used to organize the offline library.
+     */
+    public String channel;
+
+    /**
      * Length of the current resource
      */
     public long length;

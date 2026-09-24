@@ -27,7 +27,7 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
     // TODO: use NewPipeSQLiteHelper ('s constants) when playlist branch is merged (?)
     private static final String DATABASE_NAME = "downloads.db";
 
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     /**
      * The table name of download missions (old)
@@ -43,6 +43,8 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
      * The key to the urls of a mission
      */
     private static final String KEY_SOURCE = "url";
+
+    private static final String KEY_CHANNEL = "channel";
 
 
     /**
@@ -63,6 +65,7 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
             "CREATE TABLE " + FINISHED_TABLE_NAME + " (" +
                     KEY_PATH + " TEXT NOT NULL, " +
                     KEY_SOURCE + " TEXT NOT NULL, " +
+                    KEY_CHANNEL + " TEXT NOT NULL DEFAULT '', " +
                     KEY_DONE + " INTEGER NOT NULL, " +
                     KEY_TIMESTAMP + " INTEGER NOT NULL, " +
                     KEY_KIND + " TEXT NOT NULL, " +
@@ -130,6 +133,12 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
 
             cursor.close();
             db.execSQL("DROP TABLE " + MISSIONS_TABLE_NAME_v2);
+            oldVersion++;
+        }
+
+        if (oldVersion == 4) {
+            db.execSQL("ALTER TABLE " + FINISHED_TABLE_NAME
+                    + " ADD COLUMN " + KEY_CHANNEL + " TEXT NOT NULL DEFAULT '';");
         }
     }
 
@@ -142,6 +151,7 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
     private ContentValues getValuesOfMission(@NonNull Mission downloadMission) {
         ContentValues values = new ContentValues();
         values.put(KEY_SOURCE, downloadMission.source);
+        values.put(KEY_CHANNEL, downloadMission.channel == null ? "" : downloadMission.channel);
         values.put(KEY_PATH, downloadMission.storage.getUri().toString());
         values.put(KEY_DONE, downloadMission.length);
         values.put(KEY_TIMESTAMP, downloadMission.timestamp);
@@ -159,6 +169,7 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
         FinishedMission mission = new FinishedMission();
 
         mission.source = cursor.getString(cursor.getColumnIndexOrThrow(KEY_SOURCE));
+        mission.channel = cursor.getString(cursor.getColumnIndexOrThrow(KEY_CHANNEL));
         mission.length = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_DONE));
         mission.timestamp = cursor.getLong(cursor.getColumnIndexOrThrow(KEY_TIMESTAMP));
         mission.kind = kind.charAt(0);
@@ -181,7 +192,8 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
     public ArrayList<FinishedMission> loadFinishedMissions() {
         SQLiteDatabase database = getReadableDatabase();
         Cursor cursor = database.query(FINISHED_TABLE_NAME, null, null,
-                null, null, null, KEY_TIMESTAMP + " DESC");
+                null, null, null, KEY_CHANNEL + " COLLATE NOCASE, "
+                        + KEY_TIMESTAMP + " DESC");
 
         int count = cursor.getCount();
         if (count == 0) return new ArrayList<>(1);
@@ -192,6 +204,15 @@ public class FinishedMissionStore extends SQLiteOpenHelper {
         }
 
         return result;
+    }
+
+    public FinishedMission findBySource(@NonNull final String source) {
+        final SQLiteDatabase database = getReadableDatabase();
+        try (Cursor cursor = database.query(FINISHED_TABLE_NAME, null,
+                KEY_SOURCE + " = ?", new String[]{source}, null, null,
+                KEY_TIMESTAMP + " DESC", "1")) {
+            return cursor.moveToFirst() ? getMissionFromCursor(cursor) : null;
+        }
     }
 
     public void addFinishedMission(DownloadMission downloadMission) {

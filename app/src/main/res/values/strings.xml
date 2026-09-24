@@ -172,6 +172,9 @@
     <string name="duration_live">Live</string>
     <string name="downloads">Downloads</string>
     <string name="downloads_title">Downloads</string>
+    <string name="offline_player_title">Offline player</string>
+    <string name="offline_playback_failed">This downloaded file could not be played</string>
+    <string name="offline_unknown_channel">Unknown channel</string>
     <string name="loading_metadata_title">Loading Metadata…</string>
     <string name="error_report_title">Error report</string>
     <string name="all">All</string>
