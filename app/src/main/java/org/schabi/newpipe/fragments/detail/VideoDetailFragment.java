@@ -89,6 +89,8 @@ import org.schabi.newpipe.fragments.MainFragment;
 import org.schabi.newpipe.fragments.list.comments.CommentsFragment;
 import org.schabi.newpipe.fragments.list.videos.RelatedItemsFragment;
 import org.schabi.newpipe.ktx.AnimationType;
+import org.schabi.newpipe.learning.AiLearningDialog;
+import org.schabi.newpipe.learning.SubtitleRepository;
 import org.schabi.newpipe.local.dialog.PlaylistDialog;
 import org.schabi.newpipe.local.history.HistoryRecordManager;
 import org.schabi.newpipe.local.playlist.LocalPlaylistFragment;
@@ -509,6 +511,23 @@ public final class VideoDetailFragment
                 openDownloadDialog();
             }
         });
+        binding.detailControlsAiLearning.setOnClickListener(makeOnClickListener(info -> {
+            Toast.makeText(requireContext(), R.string.loading_subtitles,
+                    Toast.LENGTH_SHORT).show();
+            SubtitleRepository.cache(requireContext(), info, (subtitle, error) -> {
+                if (!isAdded()) {
+                    return;
+                }
+                if (subtitle == null) {
+                    Toast.makeText(requireContext(), R.string.no_subtitles_available,
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                AiLearningDialog.show(requireContext(), info.getName(), subtitle, () ->
+                        player == null || player.exoPlayerIsNull()
+                                ? 0 : player.getExoPlayer().getCurrentPosition());
+            });
+        }));
         binding.detailControlsShare.setOnClickListener(makeOnClickListener(info ->
                 ShareUtils.shareText(requireContext(), info.getName(), info.getUrl(),
                         info.getThumbnails())));

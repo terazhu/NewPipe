@@ -229,7 +229,7 @@ public class RouterActivity extends AppCompatActivity {
             final FinishedMission downloaded = store.findBySource(url);
             if (downloaded != null && downloaded.storage.existsAsFile()) {
                 startActivity(OfflinePlayerActivity.getIntent(
-                        this, downloaded.storage.getUri(), downloaded.storage.getName()));
+                        this, downloaded.storage.getUri(), downloaded.storage.getName(), url));
                 finish();
                 return;
             }

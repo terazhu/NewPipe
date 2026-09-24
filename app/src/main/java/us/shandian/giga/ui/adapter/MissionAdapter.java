@@ -377,7 +377,8 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             return;
         }
         mContext.startActivity(OfflinePlayerActivity.getIntent(
-                mContext, mission.storage.getUri(), mission.storage.getName()));
+                mContext, mission.storage.getUri(), mission.storage.getName(),
+                mission.source == null ? "" : mission.source));
     }
 
     private void shareFile(Mission mission) {
@@ -795,7 +796,7 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
     }
 
     private static void setButtonVisible(MenuItem button, boolean visible) {
-        if (button.isVisible() != visible)
+        if (button != null && button.isVisible() != visible)
             button.setVisible(visible);
     }
 

@@ -1,8 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.exoplayer2.ui.PlayerView
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/offline_player_view"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/black"
-    android:keepScreenOn="true" />
+    android:background="@android:color/black">
+
+    <com.google.android.exoplayer2.ui.PlayerView
+        android:id="@+id/offline_player_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:keepScreenOn="true" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/offline_ai_learning"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|top"
+        android:layout_margin="16dp"
+        android:background="?attr/selectableItemBackground"
+        android:contentDescription="@string/ai_learning"
+        android:text="@string/ai_learning"
+        android:visibility="gone" />
+</FrameLayout>

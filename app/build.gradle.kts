@@ -41,6 +41,12 @@ configure<ApplicationExtension> {
     defaultConfig {
         applicationId = "com.terazhu.tubecache"
         resValue("string", "app_name", "TubeCache")
+        val arkApiKey = System.getenv("ARK_API_KEY").orEmpty()
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+        buildConfigField("String", "ARK_API_KEY", "\"$arkApiKey\"")
+        buildConfigField("String", "ARK_ENDPOINT",
+            "\"https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions\"")
         minSdk {
             version = release(NEWPIPE_VERSION_SDK_MIN)
         }
