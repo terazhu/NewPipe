@@ -10,6 +10,16 @@
         android:layout_height="match_parent"
         android:keepScreenOn="true" />
 
+    <View
+        android:id="@+id/offline_video_tap_layer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_gravity="top"
+        android:background="@android:color/transparent"
+        android:clickable="true"
+        android:focusable="false"
+        android:visibility="gone" />
+
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/offline_ai_learning"
         android:layout_width="wrap_content"

@@ -229,6 +229,7 @@ public final class Player implements PlaybackListener, Listener {
 
     private PlayerType playerType = PlayerType.MAIN;
     private int currentState = STATE_PREFLIGHT;
+    private boolean aiLearningMode = false;
 
     // audio only mode does not mean that player type is background, but that the player was
     // minimized to background but will resume automatically to the original player type
@@ -1795,6 +1796,19 @@ public final class Player implements PlaybackListener, Listener {
         } else {
             play();
         }
+    }
+
+    public boolean isAiLearningMode() {
+        return aiLearningMode;
+    }
+
+    public void setAiLearningMode(final boolean aiLearningMode) {
+        this.aiLearningMode = aiLearningMode;
+        UIs.get(VideoPlayerUi.class).ifPresent(videoPlayerUi -> {
+            if (aiLearningMode) {
+                videoPlayerUi.showControls(0);
+            }
+        });
     }
 
     public void playPrevious() {

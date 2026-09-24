@@ -844,6 +844,10 @@ public abstract class VideoPlayerUi extends PlayerUi implements SeekBar.OnSeekBa
                 });
 
         binding.getRoot().setKeepScreenOn(true);
+
+        if (player.isAiLearningMode()) {
+            showControls(0);
+        }
     }
 
     @Override

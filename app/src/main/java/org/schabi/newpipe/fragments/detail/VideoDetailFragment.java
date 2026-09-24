@@ -538,6 +538,12 @@ public final class VideoDetailFragment
                                 }
                             }
 
+                            @Override
+                            public void setLearningMode(final boolean enabled) {
+                                if (player != null) {
+                                    player.setAiLearningMode(enabled);
+                                }
+                            }
                         });
             });
         }));

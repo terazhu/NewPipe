@@ -44,7 +44,9 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
     private Uri mediaUri;
     private SubtitleRepository.CachedSubtitle subtitle;
     private PlayerView playerView;
+    private View videoTapLayer;
     private View aiButton;
+    private boolean learningMode;
 
     public static Intent getIntent(@NonNull final Context context,
                                    @NonNull final Uri uri,
@@ -65,6 +67,8 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
         source = getIntent().getStringExtra(EXTRA_SOURCE);
         setTitle(title);
         aiButton = findViewById(R.id.offline_ai_learning);
+        videoTapLayer = findViewById(R.id.offline_video_tap_layer);
+        videoTapLayer.setOnClickListener(v -> togglePlaybackFromVideoTap());
         aiButton.setVisibility(View.VISIBLE);
         aiButton.setOnClickListener(v -> openLearning());
         if (savedInstanceState != null) {
@@ -83,6 +87,7 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
         mediaUri = Uri.parse(uriText);
 
         playerView = findViewById(R.id.offline_player_view);
+        playerView.setControllerAutoShow(true);
         player = new ExoPlayer.Builder(this)
                 .setSeekBackIncrementMs(2000)
                 .setSeekForwardIncrementMs(2000)
@@ -170,13 +175,38 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
         if (playerView == null) {
             return;
         }
+        learningMode = enabled;
         final int height = enabled
                 ? Math.round(getResources().getDisplayMetrics().widthPixels * 9f / 16f)
                 : ViewGroup.LayoutParams.MATCH_PARENT;
         final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, height, Gravity.TOP);
         playerView.setLayoutParams(params);
+        videoTapLayer.setLayoutParams(new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                enabled ? Math.round(height * 0.42f) : 0,
+                Gravity.TOP));
+        videoTapLayer.setVisibility(enabled ? View.VISIBLE : View.GONE);
+        playerView.setControllerShowTimeoutMs(enabled ? 0 : 5000);
+        playerView.setControllerHideOnTouch(!enabled);
+        if (enabled) {
+            playerView.showController();
+        } else {
+            playerView.hideController();
+        }
         aiButton.setVisibility(enabled ? View.GONE : View.VISIBLE);
+    }
+
+    private void togglePlaybackFromVideoTap() {
+        if (!learningMode || player == null) {
+            return;
+        }
+        if (player.isPlaying()) {
+            player.pause();
+        } else {
+            player.play();
+        }
+        playerView.showController();
     }
 
     @Override

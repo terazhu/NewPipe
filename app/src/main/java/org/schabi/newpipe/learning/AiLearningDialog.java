@@ -131,6 +131,7 @@ public final class AiLearningDialog {
             if (window != null) {
                 window.setGravity(Gravity.BOTTOM);
                 window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
                 window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
                 final int workspaceHeight = Math.round(
                         context.getResources().getDisplayMetrics().heightPixels * 0.72f);

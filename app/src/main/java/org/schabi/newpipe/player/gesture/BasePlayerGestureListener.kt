@@ -54,6 +54,12 @@ abstract class BasePlayerGestureListener(
     }
 
     protected fun onSingleTap() {
+        if (player.isAiLearningMode) {
+            player.playPause()
+            playerUi.showControls(0)
+            return
+        }
+
         if (playerUi.isControlsVisible) {
             playerUi.hideControls(150, 0)
             return
@@ -76,7 +82,9 @@ abstract class BasePlayerGestureListener(
                     player.playerType + "]"
             )
         }
-        if (playerUi.isControlsVisible && player.currentState == Player.STATE_PLAYING) {
+        if (!player.isAiLearningMode &&
+            playerUi.isControlsVisible && player.currentState == Player.STATE_PLAYING
+        ) {
             playerUi.hideControls(
                 VideoPlayerUi.DEFAULT_CONTROLS_DURATION,
                 VideoPlayerUi.DEFAULT_CONTROLS_HIDE_TIME
