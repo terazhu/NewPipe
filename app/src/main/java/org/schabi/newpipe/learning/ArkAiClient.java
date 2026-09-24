@@ -39,7 +39,7 @@ final class ArkAiClient {
             body.put("thinking", new JSONObject().put("type", "disabled"));
         }
         final Request request = new Request.Builder()
-                .url(BuildConfig.ARK_ENDPOINT)
+                .url(BuildConfig.ARK_BASE_URL + "/chat/completions")
                 .header("Authorization", "Bearer " + apiKey)
                 .post(RequestBody.create(body.toString(), JSON))
                 .build();

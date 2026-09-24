@@ -41,12 +41,13 @@ configure<ApplicationExtension> {
     defaultConfig {
         applicationId = "com.terazhu.tubecache"
         resValue("string", "app_name", "TubeCache")
-        val arkApiKey = System.getenv("ARK_API_KEY").orEmpty()
+        val arkApiKey = (System.getenv("ARK_API_KEY")?.takeIf { it.isNotBlank() }
+            ?: providers.gradleProperty("ARK_API_KEY").orNull.orEmpty())
             .replace("\\", "\\\\")
             .replace("\"", "\\\"")
         buildConfigField("String", "ARK_API_KEY", "\"$arkApiKey\"")
-        buildConfigField("String", "ARK_ENDPOINT",
-            "\"https://ark.cn-beijing.volces.com/api/plan/v3/chat/completions\"")
+        buildConfigField("String", "ARK_BASE_URL",
+            "\"https://ark.cn-beijing.volces.com/api/plan/v3\"")
         minSdk {
             version = release(NEWPIPE_VERSION_SDK_MIN)
         }

@@ -523,9 +523,38 @@ public final class VideoDetailFragment
                             Toast.LENGTH_LONG).show();
                     return;
                 }
-                AiLearningDialog.show(requireContext(), info.getName(), subtitle, () ->
-                        player == null || player.exoPlayerIsNull()
-                                ? 0 : player.getExoPlayer().getCurrentPosition());
+                AiLearningDialog.show(requireContext(), info.getName(), subtitle,
+                        new AiLearningDialog.PlaybackController() {
+                            @Override
+                            public long getPositionMs() {
+                                return player == null || player.exoPlayerIsNull()
+                                        ? 0 : player.getExoPlayer().getCurrentPosition();
+                            }
+
+                            @Override
+                            public void seekTo(final long positionMs) {
+                                if (player != null && !player.exoPlayerIsNull()) {
+                                    player.getExoPlayer().seekTo(positionMs);
+                                }
+                            }
+
+                            @Override
+                            public boolean isPlaying() {
+                                return player != null && !player.exoPlayerIsNull()
+                                        && player.getExoPlayer().isPlaying();
+                            }
+
+                            @Override
+                            public void setPlaying(final boolean playing) {
+                                if (player != null && !player.exoPlayerIsNull()) {
+                                    if (playing) {
+                                        player.getExoPlayer().play();
+                                    } else {
+                                        player.getExoPlayer().pause();
+                                    }
+                                }
+                            }
+                        });
             });
         }));
         binding.detailControlsShare.setOnClickListener(makeOnClickListener(info ->

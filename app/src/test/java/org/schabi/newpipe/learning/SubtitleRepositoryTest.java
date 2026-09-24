@@ -65,4 +65,11 @@ public class SubtitleRepositoryTest {
         assertFalse(context.contains("line 1"));
         assertFalse(context.contains("line 7"));
     }
+
+    @Test
+    public void normalizesDictionaryLookupWords() {
+        assertEquals("don't", AiLearningDialog.normalizeLookupWord("“don't,”"));
+        assertEquals("COVID-19", AiLearningDialog.normalizeLookupWord("(COVID-19)"));
+        assertEquals("", AiLearningDialog.normalizeLookupWord("..."));
+    }
 }

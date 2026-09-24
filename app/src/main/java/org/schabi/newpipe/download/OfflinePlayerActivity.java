@@ -8,7 +8,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -40,6 +43,8 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
     private String title;
     private Uri mediaUri;
     private SubtitleRepository.CachedSubtitle subtitle;
+    private PlayerView playerView;
+    private View aiButton;
 
     public static Intent getIntent(@NonNull final Context context,
                                    @NonNull final Uri uri,
@@ -59,7 +64,7 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
         title = getIntent().getStringExtra(EXTRA_TITLE);
         source = getIntent().getStringExtra(EXTRA_SOURCE);
         setTitle(title);
-        final View aiButton = findViewById(R.id.offline_ai_learning);
+        aiButton = findViewById(R.id.offline_ai_learning);
         aiButton.setVisibility(View.VISIBLE);
         aiButton.setOnClickListener(v -> openLearning());
         if (savedInstanceState != null) {
@@ -77,7 +82,7 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
         }
         mediaUri = Uri.parse(uriText);
 
-        final PlayerView playerView = findViewById(R.id.offline_player_view);
+        playerView = findViewById(R.id.offline_player_view);
         player = new ExoPlayer.Builder(this).build();
         player.addListener(new Player.Listener() {
             @Override
@@ -138,7 +143,53 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
 
     private void showLearning() {
         AiLearningDialog.show(this, title == null ? "" : title, subtitle,
-                () -> player == null ? playbackPosition : player.getCurrentPosition());
+                new AiLearningDialog.PlaybackController() {
+                    @Override
+                    public long getPositionMs() {
+                        return player == null ? playbackPosition : player.getCurrentPosition();
+                    }
+
+                    @Override
+                    public void seekTo(final long positionMs) {
+                        if (player != null) {
+                            player.seekTo(positionMs);
+                        }
+                    }
+
+                    @Override
+                    public boolean isPlaying() {
+                        return player != null && player.isPlaying();
+                    }
+
+                    @Override
+                    public void setPlaying(final boolean playing) {
+                        if (player != null) {
+                            if (playing) {
+                                player.play();
+                            } else {
+                                player.pause();
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void setLearningMode(final boolean enabled) {
+                        updateLearningMode(enabled);
+                    }
+                });
+    }
+
+    private void updateLearningMode(final boolean enabled) {
+        if (playerView == null) {
+            return;
+        }
+        final int height = enabled
+                ? Math.round(getResources().getDisplayMetrics().widthPixels * 9f / 16f)
+                : ViewGroup.LayoutParams.MATCH_PARENT;
+        final FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, height, Gravity.TOP);
+        playerView.setLayoutParams(params);
+        aiButton.setVisibility(enabled ? View.GONE : View.VISIBLE);
     }
 
     @Override
