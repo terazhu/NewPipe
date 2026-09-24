@@ -538,22 +538,6 @@ public final class VideoDetailFragment
                                 }
                             }
 
-                            @Override
-                            public boolean isPlaying() {
-                                return player != null && !player.exoPlayerIsNull()
-                                        && player.getExoPlayer().isPlaying();
-                            }
-
-                            @Override
-                            public void setPlaying(final boolean playing) {
-                                if (player != null && !player.exoPlayerIsNull()) {
-                                    if (playing) {
-                                        player.getExoPlayer().play();
-                                    } else {
-                                        player.getExoPlayer().pause();
-                                    }
-                                }
-                            }
                         });
             });
         }));

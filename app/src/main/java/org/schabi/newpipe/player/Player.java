@@ -626,6 +626,8 @@ public final class Player implements PlaybackListener, Listener {
         simpleExoPlayer = new ExoPlayer.Builder(context, renderFactory)
                 .setTrackSelector(trackSelector)
                 .setLoadControl(loadController)
+                .setSeekBackIncrementMs(2000)
+                .setSeekForwardIncrementMs(2000)
                 .setUsePlatformDiagnostics(false)
                 .build();
         simpleExoPlayer.addListener(this);

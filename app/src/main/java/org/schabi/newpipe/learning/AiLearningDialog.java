@@ -26,7 +26,6 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -35,13 +34,11 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.content.res.AppCompatResources;
 import androidx.preference.PreferenceManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.schabi.newpipe.BuildConfig;
-import org.schabi.newpipe.R;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,10 +59,6 @@ public final class AiLearningDialog {
         long getPositionMs();
 
         void seekTo(long positionMs);
-
-        boolean isPlaying();
-
-        void setPlaying(boolean playing);
 
         default void setLearningMode(final boolean enabled) {
         }
@@ -97,7 +90,6 @@ public final class AiLearningDialog {
         private TextView answer;
         private ProgressBar progress;
         private EditText question;
-        private ImageButton playPause;
         private AlertDialog dialog;
         private int activeCue = -1;
         private boolean requesting;
@@ -118,7 +110,6 @@ public final class AiLearningDialog {
             root.setOrientation(LinearLayout.VERTICAL);
             root.setPadding(dp(12), dp(6), dp(12), dp(8));
             root.addView(buildHeader());
-            root.addView(buildPlaybackControls());
             root.addView(buildSubtitles(), new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, dp(120)));
             root.addView(buildConversation(), new LinearLayout.LayoutParams(
@@ -167,34 +158,6 @@ public final class AiLearningDialog {
             close.setContentDescription("关闭");
             close.setOnClickListener(v -> dialog.dismiss());
             row.addView(close);
-            return row;
-        }
-
-        private View buildPlaybackControls() {
-            final LinearLayout row = horizontalRow();
-            row.setGravity(Gravity.CENTER);
-            final Button rewind = compactButton("《 2秒");
-            rewind.setContentDescription("后退 2 秒");
-            rewind.setOnClickListener(v ->
-                    playback.seekTo(Math.max(0, playback.getPositionMs() - 2000)));
-            row.addView(rewind);
-
-            playPause = new ImageButton(context);
-            playPause.setBackgroundResource(android.R.color.transparent);
-            playPause.setContentDescription("播放或暂停");
-            playPause.setPadding(dp(12), dp(8), dp(12), dp(8));
-            playPause.setOnClickListener(v -> {
-                playback.setPlaying(!playback.isPlaying());
-                updatePlayPauseIcon();
-            });
-            row.addView(playPause, new LinearLayout.LayoutParams(dp(56), dp(48)));
-
-            final Button forward = compactButton("2秒 》");
-            forward.setContentDescription("前进 2 秒");
-            forward.setOnClickListener(v ->
-                    playback.seekTo(playback.getPositionMs() + 2000));
-            row.addView(forward);
-            updatePlayPauseIcon();
             return row;
         }
 
@@ -433,7 +396,6 @@ public final class AiLearningDialog {
                 subtitleScroll.post(() -> subtitleScroll.smoothScrollTo(
                         0, Math.max(0, active.getTop() - subtitleScroll.getHeight() / 2)));
             }
-            updatePlayPauseIcon();
             handler.postDelayed(captionUpdater, CAPTION_UPDATE_MS);
         }
 
@@ -451,14 +413,6 @@ public final class AiLearningDialog {
                 }
             }
             return result;
-        }
-
-        private void updatePlayPauseIcon() {
-            if (playPause == null) {
-                return;
-            }
-            playPause.setImageDrawable(AppCompatResources.getDrawable(context,
-                    playback.isPlaying() ? R.drawable.ic_pause : R.drawable.ic_play_arrow));
         }
 
         private void request(final String prompt) {

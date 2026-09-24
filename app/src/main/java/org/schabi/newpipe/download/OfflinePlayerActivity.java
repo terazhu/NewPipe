@@ -83,7 +83,10 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
         mediaUri = Uri.parse(uriText);
 
         playerView = findViewById(R.id.offline_player_view);
-        player = new ExoPlayer.Builder(this).build();
+        player = new ExoPlayer.Builder(this)
+                .setSeekBackIncrementMs(2000)
+                .setSeekForwardIncrementMs(2000)
+                .build();
         player.addListener(new Player.Listener() {
             @Override
             public void onPlayerError(@NonNull final PlaybackException error) {
@@ -153,22 +156,6 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
                     public void seekTo(final long positionMs) {
                         if (player != null) {
                             player.seekTo(positionMs);
-                        }
-                    }
-
-                    @Override
-                    public boolean isPlaying() {
-                        return player != null && player.isPlaying();
-                    }
-
-                    @Override
-                    public void setPlaying(final boolean playing) {
-                        if (player != null) {
-                            if (playing) {
-                                player.play();
-                            } else {
-                                player.pause();
-                            }
                         }
                     }
 
