@@ -50,6 +50,10 @@ public final class AiLearningDialog {
     private static final String KEY_API_KEY = "tubecache_ark_api_key";
     private static final int ASK_AI_MENU_ID = 0x544149;
     private static final long CAPTION_UPDATE_MS = 400;
+    private static final int CAPTION_TEXT_COLOR = 0xFFE0E0E0;
+    private static final int ACTIVE_CAPTION_TEXT_COLOR = 0xFFFFFFFF;
+    private static final int ACTIVE_CAPTION_BACKGROUND = 0xCC1E3A8A;
+    private static final int SELECTED_CAPTION_BACKGROUND = 0xDD0F2A66;
     private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool();
 
     private AiLearningDialog() {
@@ -174,6 +178,8 @@ public final class AiLearningDialog {
                         cue.startMs / 60000, cue.startMs / 1000 % 60, cue.text);
                 cueView.setText(new SpannableString(cueText), TextView.BufferType.SPANNABLE);
                 cueView.setTextSize(15);
+                cueView.setTextColor(CAPTION_TEXT_COLOR);
+                cueView.setHighlightColor(SELECTED_CAPTION_BACKGROUND);
                 cueView.setLongClickable(true);
                 cueView.setPadding(dp(8), dp(5), dp(8), dp(5));
                 cueView.setContentDescription("字幕 " + (i + 1));
@@ -389,11 +395,13 @@ public final class AiLearningDialog {
                 if (activeCue >= 0) {
                     cueViews.get(activeCue).setTypeface(Typeface.DEFAULT);
                     cueViews.get(activeCue).setBackgroundColor(0x00000000);
+                    cueViews.get(activeCue).setTextColor(CAPTION_TEXT_COLOR);
                 }
                 activeCue = next;
                 final TextView active = cueViews.get(activeCue);
                 active.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-                active.setBackgroundColor(0x223F51B5);
+                active.setTextColor(ACTIVE_CAPTION_TEXT_COLOR);
+                active.setBackgroundColor(ACTIVE_CAPTION_BACKGROUND);
                 subtitleScroll.post(() -> subtitleScroll.smoothScrollTo(
                         0, Math.max(0, active.getTop() - subtitleScroll.getHeight() / 2)));
             }
