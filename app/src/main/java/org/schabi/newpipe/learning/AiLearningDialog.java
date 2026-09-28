@@ -11,14 +11,9 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Layout;
-import android.text.Selection;
-import android.text.Spannable;
 import android.text.SpannableString;
-import android.view.ActionMode;
 import android.view.GestureDetector;
 import android.view.Gravity;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -48,7 +43,6 @@ import java.util.concurrent.Executors;
 
 public final class AiLearningDialog {
     private static final String KEY_API_KEY = "tubecache_ark_api_key";
-    private static final int ASK_AI_MENU_ID = 0x544149;
     private static final long CAPTION_UPDATE_MS = 400;
     private static final int CAPTION_TEXT_COLOR = 0xFFE0E0E0;
     private static final int ACTIVE_CAPTION_TEXT_COLOR = 0xFFFFFFFF;
@@ -96,6 +90,7 @@ public final class AiLearningDialog {
         private EditText question;
         private AlertDialog dialog;
         private int activeCue = -1;
+        private int selectedCue = -1;
         private boolean requesting;
         private String selectedSubtitleText = "";
 
@@ -183,8 +178,7 @@ public final class AiLearningDialog {
                 cueView.setLongClickable(true);
                 cueView.setPadding(dp(8), dp(5), dp(8), dp(5));
                 cueView.setContentDescription("字幕 " + (i + 1));
-                final ActionMode.Callback selectionAction = installSelectionAction(cueView);
-                installSubtitleGestures(cueView, cue, selectionAction);
+                installSubtitleGestures(cueView, i, cue);
                 cueViews.add(cueView);
                 cues.addView(cueView);
             }
@@ -255,8 +249,8 @@ public final class AiLearningDialog {
 
         private void installSubtitleGestures(
                 final TextView cueView,
-                final SubtitleRepository.CaptionCue cue,
-                final ActionMode.Callback selectionAction) {
+                final int cueIndex,
+                final SubtitleRepository.CaptionCue cue) {
             final GestureDetector detector = new GestureDetector(context,
                     new GestureDetector.SimpleOnGestureListener() {
                         @Override
@@ -283,64 +277,33 @@ public final class AiLearningDialog {
                         public void onLongPress(@NonNull final MotionEvent event) {
                             final int start = cueView.getText().toString().indexOf("]") + 1;
                             final int end = cueView.length();
-                            if (start > 0 && start < end
-                                    && cueView.getText() instanceof Spannable) {
-                                selectedSubtitleText = cueView.getText()
-                                        .subSequence(start, end).toString().trim();
-                                Selection.setSelection((Spannable) cueView.getText(),
-                                        start, end);
-                                cueView.startActionMode(selectionAction,
-                                        ActionMode.TYPE_FLOATING);
+                            if (start > 0 && start < end) {
+                                selectCaption(cueIndex, cueView.getText()
+                                        .subSequence(start, end).toString().trim());
                             }
                         }
                     });
             cueView.setOnTouchListener((view, event) -> detector.onTouchEvent(event));
         }
 
-        private ActionMode.Callback installSelectionAction(final TextView cueView) {
-            final ActionMode.Callback callback = new ActionMode.Callback() {
-                @Override
-                public boolean onCreateActionMode(final ActionMode mode, final Menu menu) {
-                    menu.add(0, android.R.id.copy, 0, "复制");
-                    menu.add(0, ASK_AI_MENU_ID, 1, "问 AI");
-                    return true;
-                }
-
-                @Override
-                public boolean onPrepareActionMode(final ActionMode mode, final Menu menu) {
-                    return false;
-                }
-
-                @Override
-                public boolean onActionItemClicked(final ActionMode mode, final MenuItem item) {
-                    final int start = Math.max(0, cueView.getSelectionStart());
-                    final int end = Math.max(0, cueView.getSelectionEnd());
-                    final String selection = cueView.getText().subSequence(
-                            Math.min(start, end), Math.max(start, end)).toString().trim();
-                    final String selected = selection.isEmpty()
-                            ? selectedSubtitleText : selection;
-                    if (selected.isEmpty()) {
-                        return false;
-                    }
-                    if (item.getItemId() == ASK_AI_MENU_ID) {
-                        request("请结合视频上下文讲解这段字幕：\n" + selected);
-                    } else if (item.getItemId() == android.R.id.copy) {
-                        final ClipboardManager clipboard = (ClipboardManager)
-                                context.getSystemService(Context.CLIPBOARD_SERVICE);
-                        clipboard.setPrimaryClip(ClipData.newPlainText("subtitle", selected));
-                    } else {
-                        return false;
-                    }
-                    mode.finish();
-                    return true;
-                }
-
-                @Override
-                public void onDestroyActionMode(final ActionMode mode) {
-                }
-            };
-            cueView.setCustomSelectionActionModeCallback(callback);
-            return callback;
+        private void selectCaption(final int cueIndex, final String selected) {
+            selectedCue = cueIndex;
+            selectedSubtitleText = selected;
+            refreshCaptionStyles();
+            new AlertDialog.Builder(context)
+                    .setItems(new String[]{"复制", "问 AI"}, (menu, which) -> {
+                        if (which == 0) {
+                            final ClipboardManager clipboard = (ClipboardManager)
+                                    context.getSystemService(Context.CLIPBOARD_SERVICE);
+                            clipboard.setPrimaryClip(ClipData.newPlainText(
+                                    "subtitle", selectedSubtitleText));
+                            Toast.makeText(context, "已复制字幕", Toast.LENGTH_SHORT).show();
+                        } else {
+                            request("请结合视频上下文讲解这句字幕的意思：\n"
+                                    + selectedSubtitleText);
+                        }
+                    })
+                    .show();
         }
 
         private String wordAt(final TextView textView, final MotionEvent event) {
@@ -393,19 +356,38 @@ public final class AiLearningDialog {
             final int next = findActiveCue(playback.getPositionMs());
             if (next != activeCue && next >= 0) {
                 if (activeCue >= 0) {
-                    cueViews.get(activeCue).setTypeface(Typeface.DEFAULT);
-                    cueViews.get(activeCue).setBackgroundColor(0x00000000);
-                    cueViews.get(activeCue).setTextColor(CAPTION_TEXT_COLOR);
+                    applyCaptionStyle(activeCue);
                 }
                 activeCue = next;
+                applyCaptionStyle(activeCue);
                 final TextView active = cueViews.get(activeCue);
-                active.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-                active.setTextColor(ACTIVE_CAPTION_TEXT_COLOR);
-                active.setBackgroundColor(ACTIVE_CAPTION_BACKGROUND);
                 subtitleScroll.post(() -> subtitleScroll.smoothScrollTo(
                         0, Math.max(0, active.getTop() - subtitleScroll.getHeight() / 2)));
             }
             handler.postDelayed(captionUpdater, CAPTION_UPDATE_MS);
+        }
+
+        private void refreshCaptionStyles() {
+            for (int i = 0; i < cueViews.size(); i++) {
+                applyCaptionStyle(i);
+            }
+        }
+
+        private void applyCaptionStyle(final int cueIndex) {
+            final TextView cueView = cueViews.get(cueIndex);
+            if (cueIndex == selectedCue) {
+                cueView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                cueView.setTextColor(ACTIVE_CAPTION_TEXT_COLOR);
+                cueView.setBackgroundColor(SELECTED_CAPTION_BACKGROUND);
+            } else if (cueIndex == activeCue) {
+                cueView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+                cueView.setTextColor(ACTIVE_CAPTION_TEXT_COLOR);
+                cueView.setBackgroundColor(ACTIVE_CAPTION_BACKGROUND);
+            } else {
+                cueView.setTypeface(Typeface.DEFAULT);
+                cueView.setTextColor(CAPTION_TEXT_COLOR);
+                cueView.setBackgroundColor(0x00000000);
+            }
         }
 
         private int findActiveCue(final long positionMs) {
