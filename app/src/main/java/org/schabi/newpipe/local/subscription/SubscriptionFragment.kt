@@ -25,6 +25,7 @@ import com.xwray.groupie.Group
 import com.xwray.groupie.GroupAdapter
 import com.xwray.groupie.Section
 import com.xwray.groupie.viewbinding.GroupieViewHolder
+import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import org.schabi.newpipe.R
 import org.schabi.newpipe.database.feed.model.FeedGroupEntity.Companion.GROUP_ALL_ID
@@ -38,6 +39,9 @@ import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.fragments.BaseStateFragment
 import org.schabi.newpipe.ktx.animate
+import org.schabi.newpipe.local.feed.service.FeedEventManager
+import org.schabi.newpipe.local.feed.service.FeedEventManager.Event.ErrorResultEvent
+import org.schabi.newpipe.local.feed.service.FeedEventManager.Event.SuccessResultEvent
 import org.schabi.newpipe.local.feed.service.FeedLoadService
 import org.schabi.newpipe.local.subscription.SubscriptionViewModel.SubscriptionState
 import org.schabi.newpipe.local.subscription.dialog.FeedGroupDialog
@@ -71,6 +75,7 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
     private lateinit var feedGroupsCarousel: FeedGroupCarouselItem
     private lateinit var feedGroupsSortMenuItem: GroupsHeader
     private val subscriptionsSection = Section()
+    private var manualRefreshInProgress = false
 
     @State
     @JvmField
@@ -92,6 +97,18 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
         super.onAttach(context)
         subscriptionManager = SubscriptionManager(requireContext())
         importExportHelper = SubscriptionsImportExportHelper(this)
+        disposables.add(
+            FeedEventManager.events()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe { event ->
+                    if (manualRefreshInProgress &&
+                        (event is SuccessResultEvent || event is ErrorResultEvent)
+                    ) {
+                        manualRefreshInProgress = false
+                        _binding?.swipeRefreshLayout?.isRefreshing = false
+                    }
+                }
+        )
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
@@ -208,6 +225,7 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
         }
         binding.itemsList.adapter = groupAdapter
         binding.itemsList.itemAnimator = null
+        binding.swipeRefreshLayout.setOnRefreshListener { refreshLatestVideos() }
 
         viewModel = ViewModelProvider(this)[SubscriptionViewModel::class.java]
         viewModel.stateLiveData.observe(viewLifecycleOwner) { it?.let(this::handleResult) }
@@ -288,7 +306,14 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
         if (now - preferences.getLong(LAST_FEED_REFRESH_KEY, 0L) < FEED_REFRESH_INTERVAL_MS) {
             return
         }
+        refreshLatestVideos()
+    }
+
+    private fun refreshLatestVideos() {
+        val preferences = PreferenceManager.getDefaultSharedPreferences(requireContext())
+        val now = System.currentTimeMillis()
         preferences.edit { putLong(LAST_FEED_REFRESH_KEY, now) }
+        manualRefreshInProgress = binding.swipeRefreshLayout.isRefreshing
         requireContext().startService(
             Intent(requireContext(), FeedLoadService::class.java).apply {
                 putExtra(FeedLoadService.EXTRA_GROUP_ID, GROUP_ALL_ID)
