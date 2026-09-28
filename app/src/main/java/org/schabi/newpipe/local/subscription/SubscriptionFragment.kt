@@ -2,6 +2,7 @@ package org.schabi.newpipe.local.subscription
 
 import android.content.Context
 import android.content.DialogInterface
+import android.content.Intent
 import android.os.Bundle
 import android.os.Parcelable
 import android.view.LayoutInflater
@@ -15,7 +16,9 @@ import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.edit
 import androidx.lifecycle.ViewModelProvider
+import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.GridLayoutManager
 import com.evernote.android.state.State
 import com.xwray.groupie.Group
@@ -25,6 +28,7 @@ import com.xwray.groupie.viewbinding.GroupieViewHolder
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import org.schabi.newpipe.R
 import org.schabi.newpipe.database.feed.model.FeedGroupEntity.Companion.GROUP_ALL_ID
+import org.schabi.newpipe.database.stream.StreamWithState
 import org.schabi.newpipe.databinding.DialogTitleBinding
 import org.schabi.newpipe.databinding.FeedItemCarouselBinding
 import org.schabi.newpipe.databinding.FragmentSubscriptionBinding
@@ -34,6 +38,7 @@ import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.channel.ChannelInfoItem
 import org.schabi.newpipe.fragments.BaseStateFragment
 import org.schabi.newpipe.ktx.animate
+import org.schabi.newpipe.local.feed.service.FeedLoadService
 import org.schabi.newpipe.local.subscription.SubscriptionViewModel.SubscriptionState
 import org.schabi.newpipe.local.subscription.dialog.FeedGroupDialog
 import org.schabi.newpipe.local.subscription.dialog.FeedGroupReorderDialog
@@ -97,6 +102,11 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
         super.onPause()
         itemsListState = binding.itemsList.layoutManager?.onSaveInstanceState()
         feedGroupsCarouselState = feedGroupsCarousel.onSaveInstanceState()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshLatestVideosIfNeeded()
     }
 
     override fun onDestroyView() {
@@ -258,9 +268,7 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
                 listViewMode = viewModel.getListViewMode()
             )
 
-            add(Section(feedGroupsSortMenuItem, listOf(feedGroupsCarousel)))
             groupAdapter.clear()
-            groupAdapter.add(this)
         }
 
         subscriptionsSection.setPlaceholder(ImportSubscriptionsHintPlaceholderItem())
@@ -271,6 +279,20 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
                 Header(getString(R.string.tab_subscriptions)),
                 listOf(subscriptionsSection)
             )
+        )
+    }
+
+    private fun refreshLatestVideosIfNeeded() {
+        val preferences = PreferenceManager.getDefaultSharedPreferences(requireContext())
+        val now = System.currentTimeMillis()
+        if (now - preferences.getLong(LAST_FEED_REFRESH_KEY, 0L) < FEED_REFRESH_INTERVAL_MS) {
+            return
+        }
+        preferences.edit { putLong(LAST_FEED_REFRESH_KEY, now) }
+        requireContext().startService(
+            Intent(requireContext(), FeedLoadService::class.java).apply {
+                putExtra(FeedLoadService.EXTRA_GROUP_ID, GROUP_ALL_ID)
+            }
         )
     }
 
@@ -333,6 +355,19 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
         override fun held(selectedItem: ChannelInfoItem) = showLongTapDialog(selectedItem)
     }
 
+    private val listenerLatestStream: (StreamWithState) -> Unit = { item ->
+        val stream = item.stream
+        NavigationHelper.openVideoDetailFragment(
+            requireContext(),
+            fm,
+            stream.serviceId,
+            stream.url,
+            stream.title,
+            null,
+            false
+        )
+    }
+
     override fun handleResult(result: SubscriptionState) {
         super.handleResult(result)
 
@@ -341,11 +376,8 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
                 result.subscriptions.forEach {
                     if (it is ChannelItem) {
                         it.gesturesListener = listenerChannelItem
-                        it.itemVersion = if (SubscriptionViewModel.shouldUseGridForSubscription(requireContext())) {
-                            ChannelItem.ItemVersion.GRID
-                        } else {
-                            ChannelItem.ItemVersion.MINI
-                        }
+                        it.itemVersion = ChannelItem.ItemVersion.LATEST
+                        it.streamClickListener = listenerLatestStream
                     }
                 }
 
@@ -415,6 +447,9 @@ class SubscriptionFragment : BaseStateFragment<SubscriptionState>() {
     }
 
     companion object {
+        private const val LAST_FEED_REFRESH_KEY = "subscription_latest_feed_refresh"
+        private const val FEED_REFRESH_INTERVAL_MS = 30 * 60 * 1000L
+
         val JSON_MIME_TYPE = MimeTypeMap.getSingleton()
             .getMimeTypeFromExtension("json") ?: "application/octet-stream"
     }

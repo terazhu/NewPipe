@@ -12,6 +12,7 @@ import java.time.OffsetDateTime
 import org.schabi.newpipe.database.feed.model.FeedEntity
 import org.schabi.newpipe.database.feed.model.FeedGroupEntity
 import org.schabi.newpipe.database.feed.model.FeedLastUpdatedEntity
+import org.schabi.newpipe.database.feed.model.SubscriptionStreamEntry
 import org.schabi.newpipe.database.stream.StreamWithState
 import org.schabi.newpipe.database.stream.model.StreamStateEntity
 import org.schabi.newpipe.database.subscription.NotificationMode
@@ -98,6 +99,30 @@ abstract class FeedDAO {
         includePartiallyPlayed: Boolean,
         uploadDateBefore: OffsetDateTime?
     ): Maybe<List<StreamWithState>>
+
+    @Query(
+        """
+        SELECT f.subscription_id, s.*, sst.progress_time
+        FROM feed f
+
+        INNER JOIN streams s
+        ON s.uid = f.stream_id
+
+        LEFT JOIN stream_state sst
+        ON s.uid = sst.stream_id
+
+        WHERE s.stream_type NOT IN (
+            'LIVE_STREAM',
+            'AUDIO_LIVE_STREAM',
+            'POST_LIVE_STREAM',
+            'POST_LIVE_AUDIO_STREAM'
+        )
+
+        ORDER BY f.subscription_id ASC, s.upload_date IS NULL ASC,
+            s.upload_date DESC, s.uid DESC
+        """
+    )
+    abstract fun getStreamsForSubscriptions(): Flowable<List<SubscriptionStreamEntry>>
 
     /**
      * Remove links to streams that are older than the given date

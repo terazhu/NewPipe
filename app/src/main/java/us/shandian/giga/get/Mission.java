@@ -21,6 +21,11 @@ public abstract class Mission implements Serializable {
     public String channel;
 
     /**
+     * Thumbnail URL used as the downloaded video's cover.
+     */
+    public String thumbnailUrl;
+
+    /**
      * Length of the current resource
      */
     public long length;

@@ -52,9 +52,27 @@ class SubscriptionViewModel(application: Application) : AndroidViewModel(applica
             { mutableStateLiveData.postValue(SubscriptionState.ErrorState(it)) }
         )
 
-    private var stateItemsDisposable = subscriptionManager.subscriptions()
+    private var stateItemsDisposable = Flowable.combineLatest(
+        subscriptionManager.subscriptions(),
+        feedDatabaseManager.streamsForSubscriptions(),
+        ::Pair
+    )
         .throttleLatest(DEFAULT_THROTTLE_TIMEOUT, TimeUnit.MILLISECONDS)
-        .map { it.map { entity -> ChannelItem(entity.toChannelInfoItem(), entity.uid, ChannelItem.ItemVersion.MINI) } }
+        .map { (subscriptions, streams) ->
+            val latestBySubscription = streams
+                .groupBy { it.subscriptionId }
+                .mapValues { (_, entries) ->
+                    entries.take(2).map { it.toStreamWithState() }
+                }
+            subscriptions.map { entity ->
+                ChannelItem(
+                    entity.toChannelInfoItem(),
+                    entity.uid,
+                    ChannelItem.ItemVersion.LATEST,
+                    latestBySubscription[entity.uid].orEmpty()
+                )
+            }
+        }
         .subscribeOn(Schedulers.io())
         .subscribe(
             { mutableStateLiveData.postValue(SubscriptionState.LoadedState(it)) },

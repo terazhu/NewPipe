@@ -10,6 +10,7 @@ public class FinishedMission extends Mission {
     public FinishedMission(@NonNull DownloadMission mission) {
         source = mission.source;
         channel = mission.channel;
+        thumbnailUrl = mission.thumbnailUrl;
         length = mission.length;
         timestamp = mission.timestamp;
         kind = mission.kind;

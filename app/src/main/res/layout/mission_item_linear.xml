@@ -12,14 +12,12 @@
 
         <ImageView
             android:id="@+id/item_icon"
-            android:layout_width="72dp"
-            android:layout_height="72dp"
+            android:layout_width="112dp"
+            android:layout_height="63dp"
             android:layout_centerVertical="true"
-            android:contentDescription="TODO"
-            android:gravity="center"
-            android:padding="15dp"
-            android:scaleType="fitXY"
-            app:tint="?attr/actionColor" />
+            android:contentDescription="@string/detail_thumbnail_view_description"
+            android:scaleType="centerCrop"
+            android:src="@drawable/placeholder_thumbnail_video" />
 
         <org.schabi.newpipe.views.NewPipeTextView
             android:id="@+id/item_name"

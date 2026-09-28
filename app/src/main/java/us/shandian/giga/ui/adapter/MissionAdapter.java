@@ -68,6 +68,7 @@ import org.schabi.newpipe.streams.io.StoredFileHelper;
 import org.schabi.newpipe.util.Localization;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.external_communication.ShareUtils;
+import org.schabi.newpipe.util.image.CoilHelper;
 
 import java.io.File;
 import java.net.URI;
@@ -205,7 +206,11 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
 
         Utility.FileType type = Utility.getFileType(item.mission.kind, item.mission.storage.getName());
 
-        h.icon.setImageResource(Utility.getIconForFileType(type));
+        if (item.mission.kind == 'v') {
+            CoilHelper.INSTANCE.loadThumbnail(h.icon, resolveThumbnailUrl(item.mission));
+        } else {
+            h.icon.setImageResource(Utility.getIconForFileType(type));
+        }
         h.name.setText(item.mission.storage.getName());
 
         h.progress.setColors(Utility.getBackgroundForFileType(mContext, type), Utility.getForegroundForFileType(mContext, type));
@@ -226,8 +231,7 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
             h.status.setText("100%");
             h.progress.setProgress(1.0f);
             final String size = Utility.formatBytes(item.mission.length);
-            h.size.setText(item.mission.channel == null || item.mission.channel.isBlank()
-                    ? size : item.mission.channel + " | " + size);
+            h.size.setText(size);
 
             DateFormat dateFormat = DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault());
             Date date = new Date(item.mission.timestamp);
@@ -434,6 +438,32 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.substring(1));
 
         return mimeType == null ? DEFAULT_MIME_TYPE : mimeType;
+    }
+
+    private static String resolveThumbnailUrl(@NonNull final Mission mission) {
+        if (mission.thumbnailUrl != null && !mission.thumbnailUrl.isBlank()) {
+            return mission.thumbnailUrl;
+        }
+        if (mission.source == null || mission.source.isBlank()) {
+            return null;
+        }
+
+        final Uri source = Uri.parse(mission.source);
+        String videoId = source.getQueryParameter("v");
+        final String host = source.getHost();
+        if ((videoId == null || videoId.isBlank()) && host != null) {
+            final java.util.List<String> segments = source.getPathSegments();
+            if (host.endsWith("youtu.be") && !segments.isEmpty()) {
+                videoId = segments.get(0);
+            } else if (host.endsWith("youtube.com") && segments.size() > 1
+                    && ("shorts".equals(segments.get(0))
+                    || "live".equals(segments.get(0))
+                    || "embed".equals(segments.get(0)))) {
+                videoId = segments.get(1);
+            }
+        }
+        return videoId == null || videoId.isBlank()
+                ? null : "https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg";
     }
 
     private boolean checkInvalidFile(@NonNull Mission mission) {
