@@ -6,6 +6,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Handler;
@@ -17,11 +18,13 @@ import android.text.style.UnderlineSpan;
 import android.view.ActionMode;
 import android.view.GestureDetector;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -103,6 +106,11 @@ public final class AiLearningDialog {
         private boolean captionTouchActive;
         private boolean textSelectionActive;
         private UnderlineSpan activeUnderline;
+        private View keyboardResizeView;
+        private Runnable keyboardResizeUpdater;
+        private ViewTreeObserver.OnGlobalLayoutListener keyboardLayoutListener;
+        private Window dialogWindow;
+        private int expandedWorkspaceHeight;
 
         private Session(final Context context, final String title,
                         final SubtitleRepository.CachedSubtitle subtitle,
@@ -134,6 +142,7 @@ public final class AiLearningDialog {
             dialog.setCanceledOnTouchOutside(false);
             dialog.setOnDismissListener(ignored -> {
                 handler.removeCallbacks(captionUpdater);
+                removeKeyboardResizeListener();
                 playback.setLearningMode(false);
             });
             playback.setLearningMode(true);
@@ -146,10 +155,54 @@ public final class AiLearningDialog {
                 window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
                 final int workspaceHeight = Math.round(
                         context.getResources().getDisplayMetrics().heightPixels * 0.72f);
+                dialogWindow = window;
+                expandedWorkspaceHeight = workspaceHeight;
                 window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
                         workspaceHeight);
+                installKeyboardResize(window, workspaceHeight);
             }
             handler.post(captionUpdater);
+        }
+
+        private void installKeyboardResize(final Window window,
+                                           final int workspaceHeight) {
+            final View decorView = window.getDecorView();
+            final int screenHeight = context.getResources()
+                    .getDisplayMetrics().heightPixels;
+            keyboardResizeView = decorView;
+            keyboardResizeUpdater = () -> {
+                final Rect visibleFrame = new Rect();
+                decorView.getWindowVisibleDisplayFrame(visibleFrame);
+                final int obscuredHeight = screenHeight - visibleFrame.bottom;
+                int targetHeight = workspaceHeight;
+                if (obscuredHeight > dp(160)) {
+                    targetHeight = Math.max(dp(260), workspaceHeight - obscuredHeight);
+                }
+                if (window.getAttributes().height != targetHeight) {
+                    window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, targetHeight);
+                }
+            };
+            keyboardLayoutListener = () -> {
+                keyboardResizeUpdater.run();
+                decorView.removeCallbacks(keyboardResizeUpdater);
+                decorView.postDelayed(keyboardResizeUpdater, 300);
+            };
+            decorView.getViewTreeObserver().addOnGlobalLayoutListener(keyboardLayoutListener);
+        }
+
+        private void removeKeyboardResizeListener() {
+            if (keyboardResizeView == null) {
+                return;
+            }
+            keyboardResizeView.removeCallbacks(keyboardResizeUpdater);
+            if (keyboardResizeView.getViewTreeObserver().isAlive()) {
+                keyboardResizeView.getViewTreeObserver()
+                        .removeOnGlobalLayoutListener(keyboardLayoutListener);
+            }
+            keyboardResizeView = null;
+            keyboardResizeUpdater = null;
+            keyboardLayoutListener = null;
+            dialogWindow = null;
         }
 
         private View buildHeader() {
@@ -249,7 +302,7 @@ public final class AiLearningDialog {
 
         private View buildQuestionRow() {
             final LinearLayout row = horizontalRow();
-            question = new EditText(context);
+            question = new KeyboardAwareEditText(context);
             question.setHint("问视频内容或英语表达");
             question.setSingleLine(false);
             question.setMaxLines(2);
@@ -265,6 +318,26 @@ public final class AiLearningDialog {
             });
             row.addView(send);
             return row;
+        }
+
+        private final class KeyboardAwareEditText extends EditText {
+            private KeyboardAwareEditText(final Context viewContext) {
+                super(viewContext);
+            }
+
+            @Override
+            public boolean onKeyPreIme(final int keyCode, final KeyEvent event) {
+                if (keyCode == KeyEvent.KEYCODE_BACK
+                        && event.getAction() == KeyEvent.ACTION_UP) {
+                    handler.postDelayed(() -> {
+                        if (dialogWindow != null) {
+                            dialogWindow.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
+                                    expandedWorkspaceHeight);
+                        }
+                    }, 300);
+                }
+                return super.onKeyPreIme(keyCode, event);
+            }
         }
 
         private void installSubtitleSelection(final TextView cueView) {
