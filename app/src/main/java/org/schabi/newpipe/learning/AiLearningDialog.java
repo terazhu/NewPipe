@@ -6,7 +6,6 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Handler;
@@ -92,6 +91,7 @@ public final class AiLearningDialog {
         private final JSONArray history = new JSONArray();
         private final Handler handler = new Handler(Looper.getMainLooper());
         private final List<CaptionRange> captionRanges = new ArrayList<>();
+        private final int[] windowLocation = new int[2];
         private final Runnable captionUpdater = this::updateActiveCaption;
         private ScrollView subtitleScroll;
         private TextView subtitleText;
@@ -171,9 +171,12 @@ public final class AiLearningDialog {
                     .getDisplayMetrics().heightPixels;
             keyboardResizeView = decorView;
             keyboardResizeUpdater = () -> {
-                final Rect visibleFrame = new Rect();
-                decorView.getWindowVisibleDisplayFrame(visibleFrame);
-                final int obscuredHeight = screenHeight - visibleFrame.bottom;
+                if (decorView.getHeight() == 0) {
+                    return;
+                }
+                decorView.getLocationOnScreen(windowLocation);
+                final int windowBottom = windowLocation[1] + decorView.getHeight();
+                final int obscuredHeight = Math.max(0, screenHeight - windowBottom);
                 int targetHeight = workspaceHeight;
                 if (obscuredHeight > dp(160)) {
                     targetHeight = Math.max(dp(260), workspaceHeight - obscuredHeight);
