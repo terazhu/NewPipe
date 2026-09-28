@@ -165,6 +165,13 @@ public final class OfflinePlayerActivity extends AppCompatActivity {
                     }
 
                     @Override
+                    public void pause() {
+                        if (player != null) {
+                            player.pause();
+                        }
+                    }
+
+                    @Override
                     public void setLearningMode(final boolean enabled) {
                         updateLearningMode(enabled);
                     }

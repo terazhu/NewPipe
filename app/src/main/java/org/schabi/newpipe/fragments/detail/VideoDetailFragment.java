@@ -539,6 +539,13 @@ public final class VideoDetailFragment
                             }
 
                             @Override
+                            public void pause() {
+                                if (player != null && !player.exoPlayerIsNull()) {
+                                    player.getExoPlayer().pause();
+                                }
+                            }
+
+                            @Override
                             public void setLearningMode(final boolean enabled) {
                                 if (player != null) {
                                     player.setAiLearningMode(enabled);

@@ -11,9 +11,14 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Layout;
-import android.text.SpannableString;
+import android.text.Spannable;
+import android.text.SpannableStringBuilder;
+import android.text.style.UnderlineSpan;
+import android.view.ActionMode;
 import android.view.GestureDetector;
 import android.view.Gravity;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -43,10 +48,9 @@ import java.util.concurrent.Executors;
 
 public final class AiLearningDialog {
     private static final String KEY_API_KEY = "tubecache_ark_api_key";
+    private static final int ASK_AI_MENU_ID = 0x544149;
     private static final long CAPTION_UPDATE_MS = 400;
     private static final int CAPTION_TEXT_COLOR = 0xFFE0E0E0;
-    private static final int ACTIVE_CAPTION_TEXT_COLOR = 0xFFFFFFFF;
-    private static final int ACTIVE_CAPTION_BACKGROUND = 0xCC1E3A8A;
     private static final int SELECTED_CAPTION_BACKGROUND = 0xDD0F2A66;
     private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool();
 
@@ -57,6 +61,9 @@ public final class AiLearningDialog {
         long getPositionMs();
 
         void seekTo(long positionMs);
+
+        default void pause() {
+        }
 
         default void setLearningMode(final boolean enabled) {
         }
@@ -81,18 +88,21 @@ public final class AiLearningDialog {
         private final SharedPreferences preferences;
         private final JSONArray history = new JSONArray();
         private final Handler handler = new Handler(Looper.getMainLooper());
-        private final List<TextView> cueViews = new ArrayList<>();
+        private final List<CaptionRange> captionRanges = new ArrayList<>();
         private final Runnable captionUpdater = this::updateActiveCaption;
         private ScrollView subtitleScroll;
+        private TextView subtitleText;
         private ScrollView answerScroll;
+        private View conversation;
         private TextView answer;
         private ProgressBar progress;
         private EditText question;
         private AlertDialog dialog;
         private int activeCue = -1;
-        private int selectedCue = -1;
         private boolean requesting;
-        private String selectedSubtitleText = "";
+        private boolean captionTouchActive;
+        private boolean textSelectionActive;
+        private UnderlineSpan activeUnderline;
 
         private Session(final Context context, final String title,
                         final SubtitleRepository.CachedSubtitle subtitle,
@@ -110,8 +120,10 @@ public final class AiLearningDialog {
             root.setPadding(dp(12), dp(6), dp(12), dp(8));
             root.addView(buildHeader());
             root.addView(buildSubtitles(), new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(120)));
-            root.addView(buildConversation(), new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+            conversation = buildConversation();
+            conversation.setVisibility(View.GONE);
+            root.addView(conversation, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
             root.addView(buildQuickActions());
             root.addView(buildQuestionRow());
@@ -164,25 +176,33 @@ public final class AiLearningDialog {
         private View buildSubtitles() {
             subtitleScroll = new ScrollView(context);
             subtitleScroll.setFillViewport(true);
-            final LinearLayout cues = new LinearLayout(context);
-            cues.setOrientation(LinearLayout.VERTICAL);
+            subtitleText = new SelectableSubtitleTextView(context);
+            final SpannableStringBuilder text = new SpannableStringBuilder();
             for (int i = 0; i < subtitle.cues.size(); i++) {
                 final SubtitleRepository.CaptionCue cue = subtitle.cues.get(i);
-                final TextView cueView = new TextView(context);
-                final String cueText = String.format(Locale.ROOT, "[%02d:%02d]  %s",
-                        cue.startMs / 60000, cue.startMs / 1000 % 60, cue.text);
-                cueView.setText(new SpannableString(cueText), TextView.BufferType.SPANNABLE);
-                cueView.setTextSize(15);
-                cueView.setTextColor(CAPTION_TEXT_COLOR);
-                cueView.setHighlightColor(SELECTED_CAPTION_BACKGROUND);
-                cueView.setLongClickable(true);
-                cueView.setPadding(dp(8), dp(5), dp(8), dp(5));
-                cueView.setContentDescription("字幕 " + (i + 1));
-                installSubtitleGestures(cueView, i, cue);
-                cueViews.add(cueView);
-                cues.addView(cueView);
+                if (i > 0) {
+                    text.append('\n');
+                }
+                final int lineStart = text.length();
+                text.append(String.format(Locale.ROOT, "[%02d:%02d]  ",
+                        cue.startMs / 60000, cue.startMs / 1000 % 60));
+                final int captionStart = text.length();
+                text.append(cue.text);
+                captionRanges.add(new CaptionRange(
+                        cue.startMs, lineStart, captionStart, text.length()));
             }
-            subtitleScroll.addView(cues);
+            subtitleText.setText(text, TextView.BufferType.SPANNABLE);
+            subtitleText.setTextSize(15);
+            subtitleText.setTextColor(CAPTION_TEXT_COLOR);
+            subtitleText.setHighlightColor(SELECTED_CAPTION_BACKGROUND);
+            subtitleText.setTextIsSelectable(true);
+            subtitleText.setLongClickable(true);
+            subtitleText.setPadding(dp(8), dp(5), dp(8), dp(5));
+            subtitleText.setLineSpacing(dp(3), 1);
+            subtitleText.setContentDescription("连续字幕");
+            installSubtitleSelection(subtitleText);
+            subtitleScroll.addView(subtitleText, new ScrollView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             return subtitleScroll;
         }
 
@@ -247,63 +267,141 @@ public final class AiLearningDialog {
             return row;
         }
 
-        private void installSubtitleGestures(
-                final TextView cueView,
-                final int cueIndex,
-                final SubtitleRepository.CaptionCue cue) {
-            final GestureDetector detector = new GestureDetector(context,
-                    new GestureDetector.SimpleOnGestureListener() {
-                        @Override
-                        public boolean onDown(@NonNull final MotionEvent event) {
-                            return true;
-                        }
+        private void installSubtitleSelection(final TextView cueView) {
+            cueView.setCustomSelectionActionModeCallback(new ActionMode.Callback() {
+                @Override
+                public boolean onCreateActionMode(final ActionMode mode, final Menu menu) {
+                    textSelectionActive = true;
+                    captionTouchActive = true;
+                    if (menu.findItem(android.R.id.copy) == null) {
+                        menu.add(0, android.R.id.copy, 90, "复制")
+                                .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+                    }
+                    menu.add(0, ASK_AI_MENU_ID, 100, "问 AI")
+                            .setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+                    return true;
+                }
 
-                        @Override
-                        public boolean onSingleTapConfirmed(@NonNull final MotionEvent event) {
-                            playback.seekTo(cue.startMs);
-                            return true;
-                        }
+                @Override
+                public boolean onPrepareActionMode(final ActionMode mode, final Menu menu) {
+                    return false;
+                }
 
-                        @Override
-                        public boolean onDoubleTap(@NonNull final MotionEvent event) {
-                            final String word = wordAt(cueView, event);
-                            if (!word.isEmpty()) {
-                                openDictionary(word);
-                            }
-                            return true;
-                        }
+                @Override
+                public boolean onActionItemClicked(final ActionMode mode, final MenuItem item) {
+                    if (item.getItemId() != ASK_AI_MENU_ID
+                            && item.getItemId() != android.R.id.copy) {
+                        return false;
+                    }
+                    final int start = Math.min(cueView.getSelectionStart(),
+                            cueView.getSelectionEnd());
+                    final int end = Math.max(cueView.getSelectionStart(),
+                            cueView.getSelectionEnd());
+                    if (start < 0 || end <= start) {
+                        return false;
+                    }
+                    final String selected = selectedCaptionText(start, end);
+                    if (selected.isEmpty()) {
+                        return false;
+                    }
+                    if (item.getItemId() == android.R.id.copy) {
+                        final ClipboardManager clipboard = (ClipboardManager)
+                                context.getSystemService(Context.CLIPBOARD_SERVICE);
+                        clipboard.setPrimaryClip(ClipData.newPlainText("subtitle", selected));
+                        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show();
+                        mode.finish();
+                        return true;
+                    }
+                    mode.finish();
+                    request("请结合视频上下文讲解这段字幕的意思：\n" + selected);
+                    return true;
+                }
 
-                        @Override
-                        public void onLongPress(@NonNull final MotionEvent event) {
-                            final int start = cueView.getText().toString().indexOf("]") + 1;
-                            final int end = cueView.length();
-                            if (start > 0 && start < end) {
-                                selectCaption(cueIndex, cueView.getText()
-                                        .subSequence(start, end).toString().trim());
-                            }
-                        }
-                    });
-            cueView.setOnTouchListener((view, event) -> detector.onTouchEvent(event));
+                @Override
+                public void onDestroyActionMode(final ActionMode mode) {
+                    textSelectionActive = false;
+                    captionTouchActive = false;
+                }
+            });
         }
 
-        private void selectCaption(final int cueIndex, final String selected) {
-            selectedCue = cueIndex;
-            selectedSubtitleText = selected;
-            refreshCaptionStyles();
-            new AlertDialog.Builder(context)
-                    .setItems(new String[]{"复制", "问 AI"}, (menu, which) -> {
-                        if (which == 0) {
-                            final ClipboardManager clipboard = (ClipboardManager)
-                                    context.getSystemService(Context.CLIPBOARD_SERVICE);
-                            clipboard.setPrimaryClip(ClipData.newPlainText(
-                                    "subtitle", selectedSubtitleText));
-                            Toast.makeText(context, "已复制字幕", Toast.LENGTH_SHORT).show();
-                        } else {
-                            request("请结合视频上下文讲解这句字幕的意思：\n"
-                                    + selectedSubtitleText);
+        private final class SelectableSubtitleTextView extends TextView {
+            private final GestureDetector gestures;
+
+            private SelectableSubtitleTextView(final Context viewContext) {
+                super(viewContext);
+                gestures = new GestureDetector(viewContext,
+                        new GestureDetector.SimpleOnGestureListener() {
+                            @Override
+                            public boolean onDown(@NonNull final MotionEvent event) {
+                                return true;
+                            }
+
+                            @Override
+                            public boolean onSingleTapConfirmed(
+                                    @NonNull final MotionEvent event) {
+                                final int cueIndex = findCueAtOffset(
+                                        textOffsetAt(SelectableSubtitleTextView.this, event));
+                                if (cueIndex >= 0) {
+                                    playback.seekTo(captionRanges.get(cueIndex).startMs);
+                                }
+                                return false;
+                            }
+
+                            @Override
+                            public boolean onDoubleTap(@NonNull final MotionEvent event) {
+                                final String word = wordAt(
+                                        SelectableSubtitleTextView.this, event);
+                                if (!word.isEmpty()) {
+                                    openDictionary(word);
+                                }
+                                return true;
+                            }
+
+                            @Override
+                            public void onLongPress(@NonNull final MotionEvent event) {
+                                playback.pause();
+                            }
+                        });
+            }
+
+            @Override
+            public boolean onTouchEvent(final MotionEvent event) {
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    captionTouchActive = true;
+                }
+                final boolean handled = super.onTouchEvent(event);
+                gestures.onTouchEvent(event);
+                if (event.getActionMasked() == MotionEvent.ACTION_UP
+                        || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    handler.postDelayed(() -> {
+                        if (!textSelectionActive) {
+                            captionTouchActive = false;
                         }
-                    })
-                    .show();
+                    }, 300);
+                }
+                return handled;
+            }
+        }
+
+        private String selectedCaptionText(final int selectionStart, final int selectionEnd) {
+            final StringBuilder selected = new StringBuilder();
+            for (final CaptionRange range : captionRanges) {
+                final int start = Math.max(selectionStart, range.captionStart);
+                final int end = Math.min(selectionEnd, range.captionEnd);
+                if (start >= end) {
+                    continue;
+                }
+                final String part = subtitleText.getText()
+                        .subSequence(start, end).toString().trim();
+                if (!part.isEmpty()) {
+                    if (selected.length() > 0) {
+                        selected.append('\n');
+                    }
+                    selected.append(part);
+                }
+            }
+            return selected.toString();
         }
 
         private String wordAt(final TextView textView, final MotionEvent event) {
@@ -317,10 +415,7 @@ public final class AiLearningDialog {
             if (layout == null) {
                 return new int[]{0, 0};
             }
-            final int line = layout.getLineForVertical(
-                    Math.round(event.getY()) - textView.getTotalPaddingTop());
-            final int offset = layout.getOffsetForHorizontal(line,
-                    event.getX() - textView.getTotalPaddingLeft());
+            final int offset = textOffsetAt(textView, event);
             final String text = textView.getText().toString();
             int start = Math.min(offset, text.length());
             int end = start;
@@ -331,6 +426,33 @@ public final class AiLearningDialog {
                 end++;
             }
             return new int[]{start, end};
+        }
+
+        private int textOffsetAt(final TextView textView, final MotionEvent event) {
+            final Layout layout = textView.getLayout();
+            if (layout == null) {
+                return 0;
+            }
+            final int line = layout.getLineForVertical(
+                    Math.round(event.getY()) - textView.getTotalPaddingTop());
+            return layout.getOffsetForHorizontal(line,
+                    event.getX() - textView.getTotalPaddingLeft());
+        }
+
+        private int findCueAtOffset(final int offset) {
+            int low = 0;
+            int high = captionRanges.size() - 1;
+            int result = -1;
+            while (low <= high) {
+                final int middle = (low + high) >>> 1;
+                if (captionRanges.get(middle).lineStart <= offset) {
+                    result = middle;
+                    low = middle + 1;
+                } else {
+                    high = middle - 1;
+                }
+            }
+            return result;
         }
 
         private boolean isWordCharacter(final char value) {
@@ -353,40 +475,42 @@ public final class AiLearningDialog {
             if (dialog == null || !dialog.isShowing()) {
                 return;
             }
+            if (captionTouchActive || textSelectionActive) {
+                handler.postDelayed(captionUpdater, CAPTION_UPDATE_MS);
+                return;
+            }
             final int next = findActiveCue(playback.getPositionMs());
             if (next != activeCue && next >= 0) {
-                if (activeCue >= 0) {
-                    applyCaptionStyle(activeCue);
-                }
                 activeCue = next;
-                applyCaptionStyle(activeCue);
-                final TextView active = cueViews.get(activeCue);
-                subtitleScroll.post(() -> subtitleScroll.smoothScrollTo(
-                        0, Math.max(0, active.getTop() - subtitleScroll.getHeight() / 2)));
+                updateActiveUnderline();
+                subtitleText.post(() -> {
+                    final Layout layout = subtitleText.getLayout();
+                    if (layout == null) {
+                        return;
+                    }
+                    final int line = layout.getLineForOffset(
+                            captionRanges.get(activeCue).captionStart);
+                    subtitleScroll.smoothScrollTo(0, Math.max(0,
+                            layout.getLineTop(line) - subtitleScroll.getHeight() / 2));
+                });
             }
             handler.postDelayed(captionUpdater, CAPTION_UPDATE_MS);
         }
 
-        private void refreshCaptionStyles() {
-            for (int i = 0; i < cueViews.size(); i++) {
-                applyCaptionStyle(i);
+        private void updateActiveUnderline() {
+            if (!(subtitleText.getText() instanceof Spannable)) {
+                return;
             }
-        }
-
-        private void applyCaptionStyle(final int cueIndex) {
-            final TextView cueView = cueViews.get(cueIndex);
-            if (cueIndex == selectedCue) {
-                cueView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-                cueView.setTextColor(ACTIVE_CAPTION_TEXT_COLOR);
-                cueView.setBackgroundColor(SELECTED_CAPTION_BACKGROUND);
-            } else if (cueIndex == activeCue) {
-                cueView.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-                cueView.setTextColor(ACTIVE_CAPTION_TEXT_COLOR);
-                cueView.setBackgroundColor(ACTIVE_CAPTION_BACKGROUND);
-            } else {
-                cueView.setTypeface(Typeface.DEFAULT);
-                cueView.setTextColor(CAPTION_TEXT_COLOR);
-                cueView.setBackgroundColor(0x00000000);
+            final Spannable text = (Spannable) subtitleText.getText();
+            if (activeUnderline != null) {
+                text.removeSpan(activeUnderline);
+                activeUnderline = null;
+            }
+            if (activeCue >= 0) {
+                final CaptionRange range = captionRanges.get(activeCue);
+                activeUnderline = new UnderlineSpan();
+                text.setSpan(activeUnderline, range.captionStart, range.captionEnd,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
 
@@ -406,6 +530,21 @@ public final class AiLearningDialog {
             return result;
         }
 
+        private static final class CaptionRange {
+            private final long startMs;
+            private final int lineStart;
+            private final int captionStart;
+            private final int captionEnd;
+
+            private CaptionRange(final long startMs, final int lineStart,
+                                 final int captionStart, final int captionEnd) {
+                this.startMs = startMs;
+                this.lineStart = lineStart;
+                this.captionStart = captionStart;
+                this.captionEnd = captionEnd;
+            }
+        }
+
         private void request(final String prompt) {
             if (requesting) {
                 return;
@@ -419,6 +558,7 @@ public final class AiLearningDialog {
             }
             final String selectedModel = ArkAiClient.DEFAULT_MODEL;
             requesting = true;
+            conversation.setVisibility(View.VISIBLE);
             progress.setVisibility(View.VISIBLE);
             appendConversation("你", prompt);
             final JSONArray messages = messages(prompt);
