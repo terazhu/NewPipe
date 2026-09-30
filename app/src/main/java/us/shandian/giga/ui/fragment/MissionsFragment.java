@@ -294,10 +294,10 @@ public class MissionsFragment extends Fragment {
         if (mAdapter != null) {
             mAdapter.onResume();
 
-            if (mForceUpdate) {
-                mForceUpdate = false;
-                mAdapter.forceUpdate();
-            }
+            // The service can restore persisted downloads after this fragment resumes.
+            // Always rebuild the snapshot so completed and pending missions are visible.
+            mForceUpdate = false;
+            mAdapter.forceUpdate();
 
             mBinder.addMissionEventListener(mAdapter);
             mAdapter.checkMasterButtonsVisibility();

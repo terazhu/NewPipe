@@ -791,6 +791,8 @@ public class MissionAdapter extends Adapter<ViewHolder> implements Handler.Callb
         }
 
         notifyDataSetChanged();
+        checkEmptyMessageVisibility();
+        if (mClear != null) mClear.setVisible(mIterator.hasFinishedMissions());
     }
 
     public void setLinear(boolean isLinear) {
